@@ -1,13 +1,13 @@
-#include "PKEET_FDA.h"
+#include "LGZ22.h"
 
 namespace PKEET
 {
 
-PKEET_FDA::PKEET_FDA(const std::string &param_str)
+LGZ22Scheme::LGZ22Scheme(const std::string &param_str)
 {
     if (pairing_init_set_str(pairing, param_str.c_str()) != 0)
     {
-        std::cerr << "PKEET_FDA: pairing_init_set_str failed\n";
+        std::cerr << "LGZ22Scheme: pairing_init_set_str failed\n";
         std::exit(EXIT_FAILURE);
     }
 
@@ -17,46 +17,46 @@ PKEET_FDA::PKEET_FDA(const std::string &param_str)
     lenZr = pairing_length_in_bytes_Zr(pairing);
 }
 
-PKEET_FDA::~PKEET_FDA()
+LGZ22Scheme::~LGZ22Scheme()
 {
     element_clear(g);
     pairing_clear(pairing);
 }
 
-void PKEET_FDA::H1(const uint8_t *in, size_t inlen, uint8_t *out)
+void LGZ22Scheme::H1(const uint8_t *in, size_t inlen, uint8_t *out)
 {
     uint8_t digest[SHA512_DIGEST_LENGTH];
     SHA512_hash(in, inlen, digest);
     memcpy(out, digest, MSG_BYTES + lenZr);
 }
 
-void PKEET_FDA::H2(const uint8_t *in, size_t inlen, element_t out)
+void LGZ22Scheme::H2(const uint8_t *in, size_t inlen, element_t out)
 {
     uint8_t digest[SHA256_DIGEST_LENGTH];
     SHA256_hash(in, inlen, digest);
     element_from_hash(out, digest, SHA256_DIGEST_LENGTH);
 }
 
-void PKEET_FDA::H3(const uint8_t *in, size_t inlen, uint8_t *out)
+void LGZ22Scheme::H3(const uint8_t *in, size_t inlen, uint8_t *out)
 {
     uint8_t digest[SHA256_DIGEST_LENGTH];
     SHA256_hash(in, inlen, digest);
     memcpy(out, digest, 32);
 }
 
-void PKEET_FDA::setup()
+void LGZ22Scheme::setup()
 {
     element_random(g);
 }
 
-void PKEET_FDA::serverGen(ServerKeyPair &skp)
+void LGZ22Scheme::serverGen(ServerKeyPair &skp)
 {
     element_init_Zr(skp.xc, pairing); element_random(skp.xc);
     element_init_G1(skp.Xc, pairing);
     element_pow_zn(skp.Xc, g, skp.xc);
 }
 
-void PKEET_FDA::userGen(UserKeyPair &ukp)
+void LGZ22Scheme::userGen(UserKeyPair &ukp)
 {
     element_init_Zr(ukp.x, pairing); element_random(ukp.x);
     element_init_Zr(ukp.y, pairing); element_random(ukp.y);
@@ -64,13 +64,13 @@ void PKEET_FDA::userGen(UserKeyPair &ukp)
     element_init_G1(ukp.Y, pairing); element_pow_zn(ukp.Y, g, ukp.y);
 }
 
-void PKEET_FDA::testerGen(TesterKeyPair &tkp)
+void LGZ22Scheme::testerGen(TesterKeyPair &tkp)
 {
     element_init_Zr(tkp.xt, pairing); element_random(tkp.xt);
     element_init_G1(tkp.Xt, pairing); element_pow_zn(tkp.Xt, g, tkp.xt);
 }
 
-void PKEET_FDA::encrypt(const uint8_t *m,
+void LGZ22Scheme::encrypt(const uint8_t *m,
                         UserKeyPair   &ukp,
                         ServerKeyPair &skp,
                         Ciphertext    &CT)
@@ -158,7 +158,7 @@ void PKEET_FDA::encrypt(const uint8_t *m,
     delete[] c1_buf; delete[] c2_buf; delete[] c4_buf; delete[] hbuf;
 }
 
-bool PKEET_FDA::decrypt(Ciphertext  &CT,
+bool LGZ22Scheme::decrypt(Ciphertext  &CT,
                         UserKeyPair &ukp,
                         uint8_t     *m)
 {
@@ -230,7 +230,7 @@ bool PKEET_FDA::decrypt(Ciphertext  &CT,
     return true;
 }
 
-void PKEET_FDA::auth(Ciphertext               &CT,
+void LGZ22Scheme::auth(Ciphertext               &CT,
                      UserKeyPair              &ukp,
                      ServerKeyPair            &skp,
                      std::vector<TesterKeyPair> &testers,
@@ -292,7 +292,7 @@ void PKEET_FDA::auth(Ciphertext               &CT,
     delete[] c2xc_buf;
 }
 
-bool PKEET_FDA::test(Ciphertext    &CTi, Trapdoor &TDi,
+bool LGZ22Scheme::test(Ciphertext    &CTi, Trapdoor &TDi,
                      Ciphertext    &CTj, Trapdoor &TDj,
                      TesterKeyPair &tkp,
                      ServerKeyPair &skp)

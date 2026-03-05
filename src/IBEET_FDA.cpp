@@ -333,6 +333,7 @@ bool IBEET_FDA::test3(Ciphertext &Ci, Trapdoor3i &tdi,
     element_t ej;
     element_init_GT(ej, pairing);
     element_pairing(ej, tdj.td3, Cj.C1);
+    
     element_t h2ej;
     element_init_Zr(h2ej, pairing);
     H2(ej, h2ej);

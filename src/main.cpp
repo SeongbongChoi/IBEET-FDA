@@ -8,7 +8,7 @@
 #include <string>
 
 #include "IBEET_FDA.h"
-#include "PKEET_FDA.h"
+#include "LGZ22.h"
 #include "LLH24.h"
 
 using namespace std::chrono;
@@ -393,13 +393,13 @@ static void run_ibeet(int N, int M, const std::string &param_str)
     element_clear(msk.s1); element_clear(msk.s2);
 }
 
-static void run_pkeet(int N, int M, const std::string &param_str)
+static void run_lgz22(int N, int M, const std::string &param_str)
 {
     using namespace PKEET;
 
-    std::cout << "\n=== [PKEET-FDA] Correctness Verification ===\n";
+    std::cout << "\n=== [LGZ22] Correctness Verification ===\n";
 
-    PKEET_FDA scheme(param_str);
+    LGZ22Scheme scheme(param_str);
     scheme.setup();
 
     ServerKeyPair skp;
@@ -479,7 +479,7 @@ static void run_pkeet(int N, int M, const std::string &param_str)
         element_clear(unauth_tester.Xt); element_clear(unauth_tester.xt);
     }
 
-    std::cout << "\n=== [PKEET-FDA] Benchmark: N=" << N << " M=" << M << " ===\n";
+    std::cout << "\n=== [LGZ22] Benchmark: N=" << N << " M=" << M << " ===\n";
 
     std::vector<double> t_keygen, t_encrypt, t_decrypt, t_auth, t_test;
 
@@ -693,7 +693,7 @@ static void run_llh24(int N, const std::string &param_str)
 static void print_usage(const char *prog)
 {
     std::cerr << "Usage: " << prog
-              << " -p <param_file> [-n iterations] [-m testers] [-s ibeet|pkeet|llh24|all]\n"
+              << " -p <param_file> [-n iterations] [-m testers] [-s ibeet|lgz22|llh24|all]\n"
               << "  -p  PBC pairing parameter file (required)\n"
               << "  -n  number of benchmark iterations (default: 10)\n"
               << "  -m  number of testers            (default: 1)\n"
@@ -735,7 +735,7 @@ int main(int argc, char *argv[])
     const std::string param_str = oss.str();
 
     if (mode == "ibeet" || mode == "all") run_ibeet(N, M, param_str);
-    if (mode == "pkeet" || mode == "all") run_pkeet(N, M, param_str);
+    if (mode == "lgz22" || mode == "all") run_lgz22(N, M, param_str);
     if (mode == "llh24" || mode == "all") run_llh24(N, param_str);
 
     return 0;

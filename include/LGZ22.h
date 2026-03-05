@@ -48,7 +48,7 @@ struct Trapdoor
     size_t     n;
 };
 
-class PKEET_FDA
+class LGZ22Scheme
 {
 public:
     pairing_t pairing;
@@ -56,8 +56,8 @@ public:
 
     int lenG1, lenZr;
 
-    PKEET_FDA(const std::string &param_str);
-    ~PKEET_FDA();
+    LGZ22Scheme(const std::string &param_str);
+    ~LGZ22Scheme();
 
     void setup();
 

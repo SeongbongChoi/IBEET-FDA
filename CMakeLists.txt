@@ -20,7 +20,7 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 # --- Executable ---
 add_executable(frontend
     src/IBEET_FDA.cpp
-    src/PKEET_FDA.cpp
+    src/LGZ22.cpp
     src/LLH24.cpp
     src/main.cpp
 )
