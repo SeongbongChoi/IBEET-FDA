@@ -17,12 +17,13 @@ make
 
 
 ## Running the Code
+- `-p`: PBC pairing parameter file
 - `-n`: the number of iteration
 - `-m`: the number of tester
-- `-s`: mode (ibeet, pkeet, both)
+- `-s`: mode (ibeet, lgz22, llh24, all)
 
 Example usage:
 ```
-./bin/frontend -n 10 -m 5 -s ibeet
-./bin/frontend -n 10 -m 5 -s pkeet
+./bin/frontend -p ../params/e256.param -n 10 -m 5 -s ibeet
+./bin/frontend -p ../params/e256.param -n 10 -m 5 -s lgz22
 ```
