@@ -26,7 +26,7 @@ make
 - `-p`: PBC pairing parameter file
 - `-n`: the number of iteration
 - `-m`: the number of tester
-- `-s`: mode (ibeet, lgz22, llh24, all)
+- `-s`: scheme (ibeet, lgz22, llh24, all)
 
 Example usage:
 ```
