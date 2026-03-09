@@ -1,6 +1,12 @@
 # IBEET-FDA
 Identity-based encryption with equality test supporting flexible designated authorization
 
+## Required Libraries
+1. GMP library
+2. PBC library
+3. OpenSSL
+
+
 ### Build
 
 Tested on Ubuntu 20.04.6 LTS
