@@ -7,7 +7,7 @@ Identity-based encryption with equality test supporting flexible designated auth
 3. OpenSSL
 
 
-### Build
+## Build the Project
 
 Tested on Ubuntu 20.04.6 LTS
 
