@@ -30,7 +30,7 @@ make
 
 Example usage:
 ```
-./bin/frontend -p ../params/e256.param -n 10 -m 5 -s ibeet
-./bin/frontend -p ../params/e256.param -n 10 -m 5 -s lgz22
-./bin/frontend -p ../params/e256.param -n 10 -s llh24
+./bin/frontend -p params/e256.param -n 10 -m 5 -s ibeet
+./bin/frontend -p params/e256.param -n 10 -m 5 -s lgz22
+./bin/frontend -p params/e256.param -n 10 -s llh24
 ```
