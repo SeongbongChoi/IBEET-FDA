@@ -9,7 +9,7 @@ Identity-based encryption with equality test supporting flexible designated auth
 
 ## Build the Project
 
-Tested on Ubuntu 20.04.6 LTS
+Tested on Ubuntu 24.04 LTS
 
 The library can be cloned and built with networking support as
 ```
