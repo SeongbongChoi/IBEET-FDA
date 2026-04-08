@@ -17,9 +17,22 @@ static void print_pass(const char *label) { std::cout << "  [PASS] " << label <<
 static void print_fail(const char *label) { std::cerr << "  [FAIL] " << label << "\n"; std::exit(1); }
 static void check(bool ok, const char *label) { ok ? print_pass(label) : print_fail(label); }
 
+static double elapsed_ms(high_resolution_clock::time_point t0)
+{
+    return duration<double, std::milli>(high_resolution_clock::now() - t0).count();
+}
+
 static void run_ibeet(int N, int M, const std::string &param_str)
 {
     using namespace IBEET;
+
+    auto clrCT  = [](Ciphertext &C)     { element_clear(C.C1); element_clear(C.C2); element_clear(C.C3); };
+    auto clrDK  = [](DecryptionKey &dk) { element_clear(dk.dk1); element_clear(dk.dk2); };
+    auto clrFDA = [](TrapdoorFDA &td)   {
+        element_clear(td.td1);
+        for (size_t i = 0; i <= td.n; i++) element_clear(td.td2[i]);
+        delete[] td.td2;
+    };
 
     std::cout << "\n=== [IBEET-FDA] Correctness Verification ===\n";
 
@@ -30,50 +43,42 @@ static void run_ibeet(int N, int M, const std::string &param_str)
     const std::string id_alice = "alice@example.com";
     const std::string id_bob   = "bob@example.com";
 
-    uint8_t msg_orig[L1];
-    memset(msg_orig, 0xAB, L1);
+    uint8_t msg_orig[L1]; memset(msg_orig, 0xAB, L1);
+    uint8_t msg_diff[L1]; memset(msg_diff, 0xCD, L1);
 
     DecryptionKey dk_alice, dk_bob;
     scheme.extract(id_alice, msk, dk_alice);
     scheme.extract(id_bob,   msk, dk_bob);
 
+    // ---- Encrypt / Decrypt ----
     {
         Ciphertext C;
         scheme.encrypt(id_alice, msg_orig, C);
 
         uint8_t msg_dec[L1] = {};
         bool ok = scheme.decrypt(dk_alice, C, msg_dec);
-        check(ok && memcmp(msg_orig, msg_dec, L1) == 0,
-              "Encrypt -> Decrypt (correct key)");
+        check(ok && memcmp(msg_orig, msg_dec, L1) == 0, "Encrypt -> Decrypt (correct key)");
 
         uint8_t msg_bad[L1] = {};
         bool bad = scheme.decrypt(dk_bob, C, msg_bad);
         check(!bad, "Decrypt with wrong key returns false");
 
-        element_clear(C.C1); element_clear(C.C2); element_clear(C.C3);
+        clrCT(C);
     }
 
     std::vector<std::string> tester_ids;
     std::vector<DecryptionKey> dk_testers(M);
-    for (int i = 0; i < M; i++)
-    {
+    for (int i = 0; i < M; i++) {
         tester_ids.push_back("tester" + std::to_string(i) + "@example.com");
         scheme.extract(tester_ids[i], msk, dk_testers[i]);
     }
-
-    auto clrTD = [](TrapdoorFDA &td) {
-        element_clear(td.td1);
-        for (size_t i = 0; i <= td.n; i++) element_clear(td.td2[i]);
-        delete[] td.td2;
-    };
 
     // ---- Type-1 ----
     {
         Ciphertext Ci, Cj, Ck;
         scheme.encrypt(id_alice, msg_orig, Ci);
         scheme.encrypt(id_alice, msg_orig, Cj);
-        uint8_t msg2[L1]; memset(msg2, 0xCD, L1);
-        scheme.encrypt(id_alice, msg2, Ck);
+        scheme.encrypt(id_alice, msg_diff, Ck);
 
         Trapdoor1 tdi, tdj, tdk;
         scheme.auth1(dk_alice, tdi);
@@ -83,9 +88,7 @@ static void run_ibeet(int N, int M, const std::string &param_str)
         check( scheme.test1(Ci, tdi, Cj, tdj), "Type-1: same plaintext -> true");
         check(!scheme.test1(Ci, tdi, Ck, tdk), "Type-1: diff plaintext -> false");
 
-        element_clear(Ci.C1); element_clear(Ci.C2); element_clear(Ci.C3);
-        element_clear(Cj.C1); element_clear(Cj.C2); element_clear(Cj.C3);
-        element_clear(Ck.C1); element_clear(Ck.C2); element_clear(Ck.C3);
+        clrCT(Ci); clrCT(Cj); clrCT(Ck);
         element_clear(tdi.td1); element_clear(tdj.td1); element_clear(tdk.td1);
     }
 
@@ -94,8 +97,7 @@ static void run_ibeet(int N, int M, const std::string &param_str)
         Ciphertext Ci, Cj, Ck;
         scheme.encrypt(id_alice, msg_orig, Ci);
         scheme.encrypt(id_alice, msg_orig, Cj);
-        uint8_t msg2[L1]; memset(msg2, 0xCD, L1);
-        scheme.encrypt(id_alice, msg2, Ck);
+        scheme.encrypt(id_alice, msg_diff, Ck);
 
         Trapdoor2 tdi, tdj, tdk;
         scheme.auth2(dk_alice, Ci, tdi);
@@ -105,9 +107,7 @@ static void run_ibeet(int N, int M, const std::string &param_str)
         check( scheme.test2(Ci, tdi, Cj, tdj), "Type-2: same plaintext -> true");
         check(!scheme.test2(Ci, tdi, Ck, tdk), "Type-2: diff plaintext -> false");
 
-        element_clear(Ci.C1); element_clear(Ci.C2); element_clear(Ci.C3);
-        element_clear(Cj.C1); element_clear(Cj.C2); element_clear(Cj.C3);
-        element_clear(Ck.C1); element_clear(Ck.C2); element_clear(Ck.C3);
+        clrCT(Ci); clrCT(Cj); clrCT(Ck);
         element_clear(tdi.td2); element_clear(tdj.td2); element_clear(tdk.td2);
     }
 
@@ -116,8 +116,7 @@ static void run_ibeet(int N, int M, const std::string &param_str)
         Ciphertext Ci, Cj, Ck;
         scheme.encrypt(id_alice, msg_orig, Ci);
         scheme.encrypt(id_alice, msg_orig, Cj);
-        uint8_t msg2[L1]; memset(msg2, 0xCD, L1);
-        scheme.encrypt(id_alice, msg2, Ck);
+        scheme.encrypt(id_alice, msg_diff, Ck);
 
         Trapdoor3i tdi, tdk;
         Trapdoor3j tdj, tdl;
@@ -129,9 +128,7 @@ static void run_ibeet(int N, int M, const std::string &param_str)
         check( scheme.test3(Ci, tdi, Cj, tdj), "Type-3: same plaintext -> true");
         check(!scheme.test3(Ci, tdi, Ck, tdl), "Type-3: diff plaintext -> false");
 
-        element_clear(Ci.C1); element_clear(Ci.C2); element_clear(Ci.C3);
-        element_clear(Cj.C1); element_clear(Cj.C2); element_clear(Cj.C3);
-        element_clear(Ck.C1); element_clear(Ck.C2); element_clear(Ck.C3);
+        clrCT(Ci); clrCT(Cj); clrCT(Ck);
         element_clear(tdi.td3); element_clear(tdj.td3);
         element_clear(tdk.td3); element_clear(tdl.td3);
     }
@@ -141,8 +138,7 @@ static void run_ibeet(int N, int M, const std::string &param_str)
         Ciphertext Ci, Cj, Ck;
         scheme.encrypt(id_alice, msg_orig, Ci);
         scheme.encrypt(id_alice, msg_orig, Cj);
-        uint8_t msg2[L1]; memset(msg2, 0xCD, L1);
-        scheme.encrypt(id_alice, msg2, Ck);
+        scheme.encrypt(id_alice, msg_diff, Ck);
 
         element_t gamma;
         element_init_Zr(gamma, scheme.pairing);
@@ -157,9 +153,7 @@ static void run_ibeet(int N, int M, const std::string &param_str)
         check( scheme.test4(Ci, tdi, Cj, tdj), "Type-4: same plaintext -> true");
         check(!scheme.test4(Ci, tdk, Ck, tdl), "Type-4: diff plaintext -> false");
 
-        element_clear(Ci.C1); element_clear(Ci.C2); element_clear(Ci.C3);
-        element_clear(Cj.C1); element_clear(Cj.C2); element_clear(Cj.C3);
-        element_clear(Ck.C1); element_clear(Ck.C2); element_clear(Ck.C3);
+        clrCT(Ci); clrCT(Cj); clrCT(Ck);
         element_clear(tdi.TD1); element_clear(tdi.TD2);
         element_clear(tdj.TD1); element_clear(tdj.TD2);
         element_clear(tdk.TD1); element_clear(tdk.TD2);
@@ -169,40 +163,29 @@ static void run_ibeet(int N, int M, const std::string &param_str)
 
     // ---- FDA ----
     {
-        Ciphertext Ci, Cj;
+        Ciphertext Ci, Cj, Ck;
         scheme.encrypt(id_alice, msg_orig, Ci);
         scheme.encrypt(id_alice, msg_orig, Cj);
+        scheme.encrypt(id_alice, msg_diff, Ck);
 
-        TrapdoorFDA tdi, tdj;
+        TrapdoorFDA tdi, tdj, tdk;
         scheme.authFDA(Ci, dk_alice, tester_ids, tdi);
         scheme.authFDA(Cj, dk_alice, tester_ids, tdj);
-
-        bool same = scheme.testFDA(Ci, tdi, Cj, tdj, dk_testers[0]);
-        check(same, "FDA: same plaintext -> true");
-
-        uint8_t msg2[L1];
-        memset(msg2, 0xCD, L1);
-        Ciphertext Ck;
-        scheme.encrypt(id_alice, msg2, Ck);
-        TrapdoorFDA tdk;
         scheme.authFDA(Ck, dk_alice, tester_ids, tdk);
 
-        bool diff = scheme.testFDA(Ci, tdi, Ck, tdk, dk_testers[0]);
-        check(!diff, "FDA: diff plaintext -> false");
+        check( scheme.testFDA(Ci, tdi, Cj, tdj, dk_testers[0]), "FDA: same plaintext -> true");
+        check(!scheme.testFDA(Ci, tdi, Ck, tdk, dk_testers[0]), "FDA: diff plaintext -> false");
 
-        std::vector<std::string> other_ids = {"unauthorized@example.com"};
         DecryptionKey dk_unauth;
-        scheme.extract(other_ids[0], msk, dk_unauth);
-        bool unauth = scheme.testFDA(Ci, tdi, Cj, tdj, dk_unauth);
-        check(!unauth, "FDA: unauthorized tester -> false");
+        scheme.extract("unauthorized@example.com", msk, dk_unauth);
+        check(!scheme.testFDA(Ci, tdi, Cj, tdj, dk_unauth), "FDA: unauthorized tester -> false");
 
-        element_clear(Ci.C1); element_clear(Ci.C2); element_clear(Ci.C3);
-        element_clear(Cj.C1); element_clear(Cj.C2); element_clear(Cj.C3);
-        element_clear(Ck.C1); element_clear(Ck.C2); element_clear(Ck.C3);
-        clrTD(tdi); clrTD(tdj); clrTD(tdk);
-        element_clear(dk_unauth.dk1); element_clear(dk_unauth.dk2);
+        clrCT(Ci); clrCT(Cj); clrCT(Ck);
+        clrFDA(tdi); clrFDA(tdj); clrFDA(tdk);
+        clrDK(dk_unauth);
     }
 
+    // ---- Benchmark ----
     std::cout << "\n=== [IBEET-FDA] Benchmark: N=" << N << " M=" << M << " ===\n";
 
     std::vector<double> t_setup, t_extract, t_encrypt, t_decrypt;
@@ -212,56 +195,51 @@ static void run_ibeet(int N, int M, const std::string &param_str)
     std::vector<double> t_auth4, t_test4;
     std::vector<double> t_authFDA, t_testFDA;
 
-    for (int i = 0; i < N; i++)
-    {
+    for (int i = 0; i < N; i++) {
         MasterSecretKey tmp;
         auto t0 = high_resolution_clock::now();
         scheme.setup(tmp);
-        t_setup.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+        t_setup.push_back(elapsed_ms(t0));
         element_clear(tmp.s1); element_clear(tmp.s2);
     }
 
-    for (int i = 0; i < N; i++)
-    {
+    for (int i = 0; i < N; i++) {
         DecryptionKey dk;
         auto t0 = high_resolution_clock::now();
         scheme.extract(id_alice, msk, dk);
-        t_extract.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
-        element_clear(dk.dk1); element_clear(dk.dk2);
+        t_extract.push_back(elapsed_ms(t0));
+        clrDK(dk);
     }
 
+    // N+1 ciphertexts/trapdoors: N are benchmarked, one extra for pairwise tests
     std::vector<Ciphertext> ctxts(N + 1);
-    for (int i = 0; i <= N; i++)
-    {
+    for (int i = 0; i < N; i++) {
         auto t0 = high_resolution_clock::now();
         scheme.encrypt(id_alice, msg_orig, ctxts[i]);
-        if (i < N)
-            t_encrypt.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+        t_encrypt.push_back(elapsed_ms(t0));
     }
+    scheme.encrypt(id_alice, msg_orig, ctxts[N]);
 
-    for (int i = 0; i < N; i++)
-    {
+    for (int i = 0; i < N; i++) {
         uint8_t dec[L1] = {};
         auto t0 = high_resolution_clock::now();
         scheme.decrypt(dk_alice, ctxts[i], dec);
-        t_decrypt.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+        t_decrypt.push_back(elapsed_ms(t0));
     }
 
     // Type-1
     {
         std::vector<Trapdoor1> td1s(N + 1);
-        for (int i = 0; i <= N; i++)
-        {
+        for (int i = 0; i < N; i++) {
             auto t0 = high_resolution_clock::now();
             scheme.auth1(dk_alice, td1s[i]);
-            if (i < N)
-                t_auth1.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+            t_auth1.push_back(elapsed_ms(t0));
         }
-        for (int i = 0; i < N; i++)
-        {
+        scheme.auth1(dk_alice, td1s[N]);
+        for (int i = 0; i < N; i++) {
             auto t0 = high_resolution_clock::now();
             scheme.test1(ctxts[i], td1s[i], ctxts[i + 1], td1s[i + 1]);
-            t_test1.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+            t_test1.push_back(elapsed_ms(t0));
         }
         for (int i = 0; i <= N; i++) element_clear(td1s[i].td1);
     }
@@ -269,18 +247,16 @@ static void run_ibeet(int N, int M, const std::string &param_str)
     // Type-2
     {
         std::vector<Trapdoor2> td2s(N + 1);
-        for (int i = 0; i <= N; i++)
-        {
+        for (int i = 0; i < N; i++) {
             auto t0 = high_resolution_clock::now();
             scheme.auth2(dk_alice, ctxts[i], td2s[i]);
-            if (i < N)
-                t_auth2.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+            t_auth2.push_back(elapsed_ms(t0));
         }
-        for (int i = 0; i < N; i++)
-        {
+        scheme.auth2(dk_alice, ctxts[N], td2s[N]);
+        for (int i = 0; i < N; i++) {
             auto t0 = high_resolution_clock::now();
             scheme.test2(ctxts[i], td2s[i], ctxts[i + 1], td2s[i + 1]);
-            t_test2.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+            t_test2.push_back(elapsed_ms(t0));
         }
         for (int i = 0; i <= N; i++) element_clear(td2s[i].td2);
     }
@@ -289,28 +265,24 @@ static void run_ibeet(int N, int M, const std::string &param_str)
     {
         std::vector<Trapdoor3i> td3is(N + 1);
         std::vector<Trapdoor3j> td3js(N + 1);
-        for (int i = 0; i <= N; i++)
-        {
+        for (int i = 0; i < N; i++) {
             auto t0 = high_resolution_clock::now();
             scheme.auth3i(dk_alice, ctxts[i], td3is[i]);
-            if (i < N)
-                t_auth3i.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+            t_auth3i.push_back(elapsed_ms(t0));
         }
-        for (int i = 0; i <= N; i++)
-        {
+        scheme.auth3i(dk_alice, ctxts[N], td3is[N]);
+        for (int i = 0; i < N; i++) {
             auto t0 = high_resolution_clock::now();
             scheme.auth3j(dk_alice, td3js[i]);
-            if (i < N)
-                t_auth3j.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+            t_auth3j.push_back(elapsed_ms(t0));
         }
-        for (int i = 0; i < N; i++)
-        {
+        scheme.auth3j(dk_alice, td3js[N]);
+        for (int i = 0; i < N; i++) {
             auto t0 = high_resolution_clock::now();
             scheme.test3(ctxts[i], td3is[i], ctxts[i + 1], td3js[i + 1]);
-            t_test3.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+            t_test3.push_back(elapsed_ms(t0));
         }
-        for (int i = 0; i <= N; i++)
-        {
+        for (int i = 0; i <= N; i++) {
             element_clear(td3is[i].td3);
             element_clear(td3js[i].td3);
         }
@@ -323,21 +295,18 @@ static void run_ibeet(int N, int M, const std::string &param_str)
         element_random(gamma);
 
         std::vector<Trapdoor4> td4s(N + 1);
-        for (int i = 0; i <= N; i++)
-        {
+        for (int i = 0; i < N; i++) {
             auto t0 = high_resolution_clock::now();
             scheme.auth4(dk_alice, ctxts[i], ctxts[(i + 1) % (N + 1)], gamma, td4s[i]);
-            if (i < N)
-                t_auth4.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+            t_auth4.push_back(elapsed_ms(t0));
         }
-        for (int i = 0; i < N; i++)
-        {
+        scheme.auth4(dk_alice, ctxts[N], ctxts[0], gamma, td4s[N]);
+        for (int i = 0; i < N; i++) {
             auto t0 = high_resolution_clock::now();
             scheme.test4(ctxts[i], td4s[i], ctxts[i + 1], td4s[i + 1]);
-            t_test4.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+            t_test4.push_back(elapsed_ms(t0));
         }
-        for (int i = 0; i <= N; i++)
-        {
+        for (int i = 0; i <= N; i++) {
             element_clear(td4s[i].TD1);
             element_clear(td4s[i].TD2);
         }
@@ -346,18 +315,16 @@ static void run_ibeet(int N, int M, const std::string &param_str)
 
     // FDA
     std::vector<TrapdoorFDA> tds(N + 1);
-    for (int i = 0; i <= N; i++)
-    {
+    for (int i = 0; i < N; i++) {
         auto t0 = high_resolution_clock::now();
         scheme.authFDA(ctxts[i], dk_alice, tester_ids, tds[i]);
-        if (i < N)
-            t_authFDA.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+        t_authFDA.push_back(elapsed_ms(t0));
     }
-    for (int i = 0; i < N; i++)
-    {
+    scheme.authFDA(ctxts[N], dk_alice, tester_ids, tds[N]);
+    for (int i = 0; i < N; i++) {
         auto t0 = high_resolution_clock::now();
         scheme.testFDA(ctxts[i], tds[i], ctxts[i + 1], tds[i + 1], dk_testers[0]);
-        t_testFDA.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+        t_testFDA.push_back(elapsed_ms(t0));
     }
 
     std::cout << "Setup      : " << avg(t_setup)   << " ms\n";
@@ -376,26 +343,30 @@ static void run_ibeet(int N, int M, const std::string &param_str)
     std::cout << "Auth(FDA)  : " << avg(t_authFDA) << " ms\n";
     std::cout << "Test(FDA)  : " << avg(t_testFDA) << " ms\n";
 
-    element_clear(dk_alice.dk1); element_clear(dk_alice.dk2);
-    element_clear(dk_bob.dk1);   element_clear(dk_bob.dk2);
-    for (int i = 0; i < M; i++)
-    {
-        element_clear(dk_testers[i].dk1);
-        element_clear(dk_testers[i].dk2);
-    }
-    for (int i = 0; i <= N; i++)
-    {
-        element_clear(ctxts[i].C1);
-        element_clear(ctxts[i].C2);
-        element_clear(ctxts[i].C3);
-        clrTD(tds[i]);
-    }
+    clrDK(dk_alice);
+    clrDK(dk_bob);
+    for (int i = 0; i < M; i++) clrDK(dk_testers[i]);
+    for (int i = 0; i <= N; i++) { clrCT(ctxts[i]); clrFDA(tds[i]); }
     element_clear(msk.s1); element_clear(msk.s2);
 }
 
 static void run_lgz22(int N, int M, const std::string &param_str)
 {
     using namespace PKEET;
+
+    auto clrCT = [](Ciphertext &C) {
+        element_clear(C.c1); element_clear(C.c2); element_clear(C.c4);
+        delete[] C.c3;
+    };
+    auto clrTD = [](Trapdoor &T) {
+        element_clear(T.td2);
+        for (size_t i = 0; i <= T.n; i++) element_clear(T.td1[i]);
+        delete[] T.td1;
+    };
+    auto clrUKP = [](UserKeyPair &ukp) {
+        element_clear(ukp.X); element_clear(ukp.Y);
+        element_clear(ukp.x); element_clear(ukp.y);
+    };
 
     std::cout << "\n=== [LGZ22] Correctness Verification ===\n";
 
@@ -409,69 +380,49 @@ static void run_lgz22(int N, int M, const std::string &param_str)
     scheme.userGen(ukp_alice);
     scheme.userGen(ukp_bob);
 
-    uint8_t msg_orig[MSG_BYTES];
-    memset(msg_orig, 0xAB, MSG_BYTES);
+    uint8_t msg_orig[MSG_BYTES]; memset(msg_orig, 0xAB, MSG_BYTES);
+    uint8_t msg_diff[MSG_BYTES]; memset(msg_diff, 0xCD, MSG_BYTES);
 
+    // ---- Encrypt / Decrypt ----
     {
         Ciphertext CT;
         scheme.encrypt(msg_orig, ukp_alice, skp, CT);
 
         uint8_t msg_dec[MSG_BYTES] = {};
         bool ok = scheme.decrypt(CT, ukp_alice, msg_dec);
-        check(ok && memcmp(msg_orig, msg_dec, MSG_BYTES) == 0,
-              "Encrypt -> Decrypt (correct key)");
+        check(ok && memcmp(msg_orig, msg_dec, MSG_BYTES) == 0, "Encrypt -> Decrypt (correct key)");
 
         uint8_t msg_bad[MSG_BYTES] = {};
         bool bad = scheme.decrypt(CT, ukp_bob, msg_bad);
         check(!bad, "Decrypt with wrong key returns false");
 
-        element_clear(CT.c1); element_clear(CT.c2); element_clear(CT.c4);
-        delete[] CT.c3;
+        clrCT(CT);
     }
 
     std::vector<TesterKeyPair> testers(M);
     for (int i = 0; i < M; i++) scheme.testerGen(testers[i]);
 
+    // ---- Auth / Test ----
     {
-        auto clrCT = [](Ciphertext &C) {
-            element_clear(C.c1); element_clear(C.c2); element_clear(C.c4);
-            delete[] C.c3;
-        };
-        auto clrTD = [](Trapdoor &T) {
-            element_clear(T.td2);
-            for (size_t i = 0; i <= T.n; i++) element_clear(T.td1[i]);
-            delete[] T.td1;
-        };
-
-        Ciphertext CTi, CTj;
+        Ciphertext CTi, CTj, CTk;
         scheme.encrypt(msg_orig, ukp_alice, skp, CTi);
         scheme.encrypt(msg_orig, ukp_alice, skp, CTj);
+        scheme.encrypt(msg_diff, ukp_alice, skp, CTk);
 
-        Trapdoor TDi, TDj;
+        Trapdoor TDi, TDj, TDk;
         scheme.auth(CTi, ukp_alice, skp, testers, TDi);
         scheme.auth(CTj, ukp_alice, skp, testers, TDj);
-
-        bool same = scheme.test(CTi, TDi, CTj, TDj, testers[0], skp);
-        check(same, "Test returns true for same plaintext");
-
-        uint8_t msg2[MSG_BYTES];
-        memset(msg2, 0xCD, MSG_BYTES);
-        Ciphertext CTk;
-        scheme.encrypt(msg2, ukp_alice, skp, CTk);
-        Trapdoor TDk;
         scheme.auth(CTk, ukp_alice, skp, testers, TDk);
 
-        bool diff = scheme.test(CTi, TDi, CTk, TDk, testers[0], skp);
-        check(!diff, "Test returns false for different plaintext");
+        check( scheme.test(CTi, TDi, CTj, TDj, testers[0], skp), "Test returns true for same plaintext");
+        check(!scheme.test(CTi, TDi, CTk, TDk, testers[0], skp), "Test returns false for different plaintext");
 
         TesterKeyPair unauth_tester;
         scheme.testerGen(unauth_tester);
         std::vector<TesterKeyPair> unauth_set = {unauth_tester};
         Trapdoor TDj_unauth;
         scheme.auth(CTj, ukp_alice, skp, unauth_set, TDj_unauth);
-
-        bool unauth = scheme.test(CTi, TDi, CTj, TDj_unauth, unauth_tester, skp);
-        check(!unauth, "Test returns false for unauthorized tester");
+        check(!scheme.test(CTi, TDi, CTj, TDj_unauth, unauth_tester, skp), "Test returns false for unauthorized tester");
 
         clrCT(CTi); clrCT(CTj); clrCT(CTk);
         clrTD(TDi); clrTD(TDj); clrTD(TDk);
@@ -479,51 +430,47 @@ static void run_lgz22(int N, int M, const std::string &param_str)
         element_clear(unauth_tester.Xt); element_clear(unauth_tester.xt);
     }
 
+    // ---- Benchmark ----
     std::cout << "\n=== [LGZ22] Benchmark: N=" << N << " M=" << M << " ===\n";
 
     std::vector<double> t_keygen, t_encrypt, t_decrypt, t_auth, t_test;
 
-    for (int i = 0; i < N; i++)
-    {
+    for (int i = 0; i < N; i++) {
         UserKeyPair tmp;
         auto t0 = high_resolution_clock::now();
         scheme.userGen(tmp);
-        t_keygen.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
-        element_clear(tmp.X); element_clear(tmp.Y);
-        element_clear(tmp.x); element_clear(tmp.y);
+        t_keygen.push_back(elapsed_ms(t0));
+        clrUKP(tmp);
     }
 
+    // N+1 ciphertexts/trapdoors: N are benchmarked, one extra for pairwise tests
     std::vector<Ciphertext> ctxts(N + 1);
-    for (int i = 0; i <= N; i++)
-    {
+    for (int i = 0; i < N; i++) {
         auto t0 = high_resolution_clock::now();
         scheme.encrypt(msg_orig, ukp_alice, skp, ctxts[i]);
-        if (i < N)
-            t_encrypt.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+        t_encrypt.push_back(elapsed_ms(t0));
     }
+    scheme.encrypt(msg_orig, ukp_alice, skp, ctxts[N]);
 
-    for (int i = 0; i < N; i++)
-    {
+    for (int i = 0; i < N; i++) {
         uint8_t dec[MSG_BYTES] = {};
         auto t0 = high_resolution_clock::now();
         scheme.decrypt(ctxts[i], ukp_alice, dec);
-        t_decrypt.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+        t_decrypt.push_back(elapsed_ms(t0));
     }
 
     std::vector<Trapdoor> tds(N + 1);
-    for (int i = 0; i <= N; i++)
-    {
+    for (int i = 0; i < N; i++) {
         auto t0 = high_resolution_clock::now();
         scheme.auth(ctxts[i], ukp_alice, skp, testers, tds[i]);
-        if (i < N)
-            t_auth.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+        t_auth.push_back(elapsed_ms(t0));
     }
+    scheme.auth(ctxts[N], ukp_alice, skp, testers, tds[N]);
 
-    for (int i = 0; i < N; i++)
-    {
+    for (int i = 0; i < N; i++) {
         auto t0 = high_resolution_clock::now();
         scheme.test(ctxts[i], tds[i], ctxts[i + 1], tds[i + 1], testers[0], skp);
-        t_test.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+        t_test.push_back(elapsed_ms(t0));
     }
 
     std::cout << "KeyGen  : " << avg(t_keygen)  << " ms\n";
@@ -532,31 +479,22 @@ static void run_lgz22(int N, int M, const std::string &param_str)
     std::cout << "Auth    : " << avg(t_auth)    << " ms\n";
     std::cout << "Test    : " << avg(t_test)    << " ms\n";
 
-    element_clear(ukp_alice.X); element_clear(ukp_alice.Y);
-    element_clear(ukp_alice.x); element_clear(ukp_alice.y);
-    element_clear(ukp_bob.X);   element_clear(ukp_bob.Y);
-    element_clear(ukp_bob.x);   element_clear(ukp_bob.y);
+    clrUKP(ukp_alice);
+    clrUKP(ukp_bob);
     element_clear(skp.Xc); element_clear(skp.xc);
-    for (int i = 0; i < M; i++)
-    {
+    for (int i = 0; i < M; i++) {
         element_clear(testers[i].Xt);
         element_clear(testers[i].xt);
     }
-    for (int i = 0; i <= N; i++)
-    {
-        element_clear(ctxts[i].c1);
-        element_clear(ctxts[i].c2);
-        element_clear(ctxts[i].c4);
-        delete[] ctxts[i].c3;
-        element_clear(tds[i].td2);
-        for (size_t j = 0; j <= tds[i].n; j++) element_clear(tds[i].td1[j]);
-        delete[] tds[i].td1;
-    }
+    for (int i = 0; i <= N; i++) { clrCT(ctxts[i]); clrTD(tds[i]); }
 }
 
 static void run_llh24(int N, const std::string &param_str)
 {
     using namespace LLH24;
+
+    auto clrCT = [](Ciphertext &C)     { element_clear(C.c1); element_clear(C.c2); element_clear(C.c3); };
+    auto clrDK = [](DecryptionKey &dk) { element_clear(dk.dk1); element_clear(dk.dk2); };
 
     std::cout << "\n=== [LLH24] Correctness Verification ===\n";
 
@@ -568,8 +506,8 @@ static void run_llh24(int N, const std::string &param_str)
     const std::string id_bob   = "bob@example.com";
     const std::string id_carol = "carol@example.com";
 
-    uint8_t msg_orig[MSG_BYTES];
-    memset(msg_orig, 0xAB, MSG_BYTES);
+    uint8_t msg_orig[MSG_BYTES]; memset(msg_orig, 0xAB, MSG_BYTES);
+    uint8_t msg_diff[MSG_BYTES]; memset(msg_diff, 0xCD, MSG_BYTES);
 
     DecryptionKey dk_alice, dk_bob, dk_carol;
     scheme.extract(id_alice, msk, dk_alice);
@@ -583,14 +521,13 @@ static void run_llh24(int N, const std::string &param_str)
 
         uint8_t msg_dec[MSG_BYTES] = {};
         bool ok = scheme.decrypt(id_alice, dk_bob, C, msg_dec);
-        check(ok && memcmp(msg_orig, msg_dec, MSG_BYTES) == 0,
-              "Encrypt -> Decrypt (correct key)");
+        check(ok && memcmp(msg_orig, msg_dec, MSG_BYTES) == 0, "Encrypt -> Decrypt (correct key)");
 
         uint8_t msg_bad[MSG_BYTES] = {};
         bool bad = scheme.decrypt(id_alice, dk_carol, C, msg_bad);
         check(!bad, "Decrypt with wrong key returns false");
 
-        element_clear(C.c1); element_clear(C.c2); element_clear(C.c3);
+        clrCT(C);
     }
 
     // ---- Auth / Test ----
@@ -598,8 +535,7 @@ static void run_llh24(int N, const std::string &param_str)
         Ciphertext Ci, Cj, Ck;
         scheme.encrypt(id_alice, id_bob,   dk_alice, msg_orig, Ci);
         scheme.encrypt(id_alice, id_carol, dk_alice, msg_orig, Cj);
-        uint8_t msg2[MSG_BYTES]; memset(msg2, 0xCD, MSG_BYTES);
-        scheme.encrypt(id_alice, id_bob,   dk_alice, msg2,     Ck);
+        scheme.encrypt(id_alice, id_bob,   dk_alice, msg_diff, Ck);
 
         Trapdoor tdi, tdj, tdk;
         scheme.auth(id_alice, id_carol, dk_bob,   Ci, tdi);
@@ -609,65 +545,59 @@ static void run_llh24(int N, const std::string &param_str)
         check( scheme.test(Ci, tdi, Cj, tdj), "Auth/Test: same plaintext -> true");
         check(!scheme.test(Ci, tdi, Ck, tdk), "Auth/Test: diff plaintext -> false");
 
-        element_clear(Ci.c1); element_clear(Ci.c2); element_clear(Ci.c3);
-        element_clear(Cj.c1); element_clear(Cj.c2); element_clear(Cj.c3);
-        element_clear(Ck.c1); element_clear(Ck.c2); element_clear(Ck.c3);
+        clrCT(Ci); clrCT(Cj); clrCT(Ck);
         element_clear(tdi.td); element_clear(tdj.td); element_clear(tdk.td);
     }
 
+    // ---- Benchmark ----
     std::cout << "\n=== [LLH24] Benchmark: N=" << N << " ===\n";
 
     std::vector<double> t_setup, t_extract, t_encrypt, t_decrypt, t_auth, t_test;
 
-    for (int i = 0; i < N; i++)
-    {
+    for (int i = 0; i < N; i++) {
         MasterSecretKey tmp;
         auto t0 = high_resolution_clock::now();
         scheme.setup(tmp);
-        t_setup.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+        t_setup.push_back(elapsed_ms(t0));
         element_clear(tmp.s1); element_clear(tmp.s2);
     }
 
-    for (int i = 0; i < N; i++)
-    {
+    for (int i = 0; i < N; i++) {
         DecryptionKey dk;
         auto t0 = high_resolution_clock::now();
         scheme.extract(id_alice, msk, dk);
-        t_extract.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
-        element_clear(dk.dk1); element_clear(dk.dk2);
+        t_extract.push_back(elapsed_ms(t0));
+        clrDK(dk);
     }
 
+    // N+1 ciphertexts/trapdoors: N are benchmarked, one extra for pairwise tests
     std::vector<Ciphertext> ctxts(N + 1);
-    for (int i = 0; i <= N; i++)
-    {
+    for (int i = 0; i < N; i++) {
         auto t0 = high_resolution_clock::now();
         scheme.encrypt(id_alice, id_bob, dk_alice, msg_orig, ctxts[i]);
-        if (i < N)
-            t_encrypt.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+        t_encrypt.push_back(elapsed_ms(t0));
     }
+    scheme.encrypt(id_alice, id_bob, dk_alice, msg_orig, ctxts[N]);
 
-    for (int i = 0; i < N; i++)
-    {
+    for (int i = 0; i < N; i++) {
         uint8_t dec[MSG_BYTES] = {};
         auto t0 = high_resolution_clock::now();
         scheme.decrypt(id_alice, dk_bob, ctxts[i], dec);
-        t_decrypt.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+        t_decrypt.push_back(elapsed_ms(t0));
     }
 
     std::vector<Trapdoor> tds(N + 1);
-    for (int i = 0; i <= N; i++)
-    {
+    for (int i = 0; i < N; i++) {
         auto t0 = high_resolution_clock::now();
         scheme.auth(id_alice, id_carol, dk_bob, ctxts[i], tds[i]);
-        if (i < N)
-            t_auth.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+        t_auth.push_back(elapsed_ms(t0));
     }
+    scheme.auth(id_alice, id_carol, dk_bob, ctxts[N], tds[N]);
 
-    for (int i = 0; i < N; i++)
-    {
+    for (int i = 0; i < N; i++) {
         auto t0 = high_resolution_clock::now();
         scheme.test(ctxts[i], tds[i], ctxts[i + 1], tds[i + 1]);
-        t_test.push_back(duration<double, std::milli>(high_resolution_clock::now() - t0).count());
+        t_test.push_back(elapsed_ms(t0));
     }
 
     std::cout << "Setup   : " << avg(t_setup)   << " ms\n";
@@ -677,16 +607,10 @@ static void run_llh24(int N, const std::string &param_str)
     std::cout << "Auth    : " << avg(t_auth)    << " ms\n";
     std::cout << "Test    : " << avg(t_test)    << " ms\n";
 
-    element_clear(dk_alice.dk1); element_clear(dk_alice.dk2);
-    element_clear(dk_bob.dk1);   element_clear(dk_bob.dk2);
-    element_clear(dk_carol.dk1); element_clear(dk_carol.dk2);
-    for (int i = 0; i <= N; i++)
-    {
-        element_clear(ctxts[i].c1);
-        element_clear(ctxts[i].c2);
-        element_clear(ctxts[i].c3);
-        element_clear(tds[i].td);
-    }
+    clrDK(dk_alice);
+    clrDK(dk_bob);
+    clrDK(dk_carol);
+    for (int i = 0; i <= N; i++) { clrCT(ctxts[i]); element_clear(tds[i].td); }
     element_clear(msk.s1); element_clear(msk.s2);
 }
 
