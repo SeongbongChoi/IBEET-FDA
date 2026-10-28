@@ -120,12 +120,12 @@ void run_llh24(int N, const std::string &param_str)
         t_test.push_back(elapsed_ms(t0));
     }
 
-    std::cout << "Setup   : " << avg(t_setup)   << " ms\n";
-    std::cout << "Extract : " << avg(t_extract) << " ms\n";
-    std::cout << "Encrypt : " << avg(t_encrypt) << " ms\n";
-    std::cout << "Decrypt : " << avg(t_decrypt) << " ms\n";
-    std::cout << "Auth    : " << avg(t_auth)    << " ms\n";
-    std::cout << "Test    : " << avg(t_test)    << " ms\n";
+    std::cout << "Setup   : " << avg(t_setup)   << " ms (med " << median(t_setup) << ", sd " << stddev(t_setup) << ")\n";
+    std::cout << "Extract : " << avg(t_extract) << " ms (med " << median(t_extract) << ", sd " << stddev(t_extract) << ")\n";
+    std::cout << "Encrypt : " << avg(t_encrypt) << " ms (med " << median(t_encrypt) << ", sd " << stddev(t_encrypt) << ")\n";
+    std::cout << "Decrypt : " << avg(t_decrypt) << " ms (med " << median(t_decrypt) << ", sd " << stddev(t_decrypt) << ")\n";
+    std::cout << "Auth    : " << avg(t_auth)    << " ms (med " << median(t_auth) << ", sd " << stddev(t_auth) << ")\n";
+    std::cout << "Test    : " << avg(t_test)    << " ms (med " << median(t_test) << ", sd " << stddev(t_test) << ")\n";
 
     clrDK(dk_alice);
     clrDK(dk_bob);

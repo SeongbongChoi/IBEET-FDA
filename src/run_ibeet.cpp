@@ -295,19 +295,19 @@ void run_ibeet(int N, const std::vector<size_t> &Ms, const std::string &param_st
         element_clear(gamma);
     }
 
-    std::cout << "Setup      : " << avg(t_setup)   << " ms\n";
-    std::cout << "Extract    : " << avg(t_extract) << " ms\n";
-    std::cout << "Encrypt    : " << avg(t_encrypt) << " ms\n";
-    std::cout << "Decrypt    : " << avg(t_decrypt) << " ms\n";
-    std::cout << "Auth1      : " << avg(t_auth1)   << " ms\n";
-    std::cout << "Test1      : " << avg(t_test1)   << " ms\n";
-    std::cout << "Auth2      : " << avg(t_auth2)   << " ms\n";
-    std::cout << "Test2      : " << avg(t_test2)   << " ms\n";
-    std::cout << "Auth3i     : " << avg(t_auth3i)  << " ms\n";
-    std::cout << "Auth3j     : " << avg(t_auth3j)  << " ms\n";
-    std::cout << "Test3      : " << avg(t_test3)   << " ms\n";
-    std::cout << "Auth4      : " << avg(t_auth4)   << " ms\n";
-    std::cout << "Test4      : " << avg(t_test4)   << " ms\n";
+    std::cout << "Setup      : " << avg(t_setup)   << " ms (med " << median(t_setup) << ", sd " << stddev(t_setup) << ")\n";
+    std::cout << "Extract    : " << avg(t_extract) << " ms (med " << median(t_extract) << ", sd " << stddev(t_extract) << ")\n";
+    std::cout << "Encrypt    : " << avg(t_encrypt) << " ms (med " << median(t_encrypt) << ", sd " << stddev(t_encrypt) << ")\n";
+    std::cout << "Decrypt    : " << avg(t_decrypt) << " ms (med " << median(t_decrypt) << ", sd " << stddev(t_decrypt) << ")\n";
+    std::cout << "Auth1      : " << avg(t_auth1)   << " ms (med " << median(t_auth1) << ", sd " << stddev(t_auth1) << ")\n";
+    std::cout << "Test1      : " << avg(t_test1)   << " ms (med " << median(t_test1) << ", sd " << stddev(t_test1) << ")\n";
+    std::cout << "Auth2      : " << avg(t_auth2)   << " ms (med " << median(t_auth2) << ", sd " << stddev(t_auth2) << ")\n";
+    std::cout << "Test2      : " << avg(t_test2)   << " ms (med " << median(t_test2) << ", sd " << stddev(t_test2) << ")\n";
+    std::cout << "Auth3i     : " << avg(t_auth3i)  << " ms (med " << median(t_auth3i) << ", sd " << stddev(t_auth3i) << ")\n";
+    std::cout << "Auth3j     : " << avg(t_auth3j)  << " ms (med " << median(t_auth3j) << ", sd " << stddev(t_auth3j) << ")\n";
+    std::cout << "Test3      : " << avg(t_test3)   << " ms (med " << median(t_test3) << ", sd " << stddev(t_test3) << ")\n";
+    std::cout << "Auth4      : " << avg(t_auth4)   << " ms (med " << median(t_auth4) << ", sd " << stddev(t_auth4) << ")\n";
+    std::cout << "Test4      : " << avg(t_test4)   << " ms (med " << median(t_test4) << ", sd " << stddev(t_test4) << ")\n";
 
     DecryptionKey dk_unauth;
     scheme.extract("unauthorized@example.com", msk, dk_unauth);

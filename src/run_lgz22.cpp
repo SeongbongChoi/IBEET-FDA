@@ -129,11 +129,11 @@ void run_lgz22(int N, int M, const std::string &param_str)
         t_test.push_back(elapsed_ms(t0));
     }
 
-    std::cout << "KeyGen  : " << avg(t_keygen)  << " ms\n";
-    std::cout << "Encrypt : " << avg(t_encrypt) << " ms\n";
-    std::cout << "Decrypt : " << avg(t_decrypt) << " ms\n";
-    std::cout << "Auth    : " << avg(t_auth)    << " ms\n";
-    std::cout << "Test    : " << avg(t_test)    << " ms\n";
+    std::cout << "KeyGen  : " << avg(t_keygen)  << " ms (med " << median(t_keygen) << ", sd " << stddev(t_keygen) << ")\n";
+    std::cout << "Encrypt : " << avg(t_encrypt) << " ms (med " << median(t_encrypt) << ", sd " << stddev(t_encrypt) << ")\n";
+    std::cout << "Decrypt : " << avg(t_decrypt) << " ms (med " << median(t_decrypt) << ", sd " << stddev(t_decrypt) << ")\n";
+    std::cout << "Auth    : " << avg(t_auth)    << " ms (med " << median(t_auth) << ", sd " << stddev(t_auth) << ")\n";
+    std::cout << "Test    : " << avg(t_test)    << " ms (med " << median(t_test) << ", sd " << stddev(t_test) << ")\n";
 
     clrUKP(ukp_alice);
     clrUKP(ukp_bob);
